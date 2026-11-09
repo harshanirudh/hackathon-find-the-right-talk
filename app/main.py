@@ -15,6 +15,7 @@ from .store import PLACES_DATA, Store
 from .smart_search import compatible_levels, interpret_request
 from .multi_day import ConferenceRequest, ConferenceInterpretationUnavailable, extract_conference, build_conference_days
 from .telemetry import configure, record_search
+from .stages import stage
 from .local_ai import LocalAIUnavailable
 from opentelemetry import trace
 
@@ -78,7 +79,12 @@ def safe_plan_call(operation, *args):
         raise HTTPException(503, "Saved plans require Elasticsearch, which is unavailable right now.") from None
 
 
+@stage('planner.retrieve')
 def search_result(q="", track=None, level=None, captioned_only=False, mode="keyword", limit=1000, offset=0, day=None):
+    request_span = trace.get_current_span()
+    request_span.set_attribute('search.requested_mode', mode)
+    if day is not None:
+        request_span.set_attribute('planner.day', str(day))
     started = perf_counter()
     facets = {}
     strategy_reason = None
@@ -105,7 +111,14 @@ def search_result(q="", track=None, level=None, captioned_only=False, mode="keyw
             else:
                 strategy_reason = 'Strong literal matches; using keyword retrieval.'
     if use_hybrid:
-        result = store.hybrid_search(q=q, track=track, level=level, captioned_only=captioned_only, day=day)
+        hybrid_options = {}
+        if mode == 'auto' and offset == 0 and (limit >= 24 or total <= len(talks)):
+            hybrid_options['prefetched_keyword'] = (talks[:24], source, total, facets)
+            request_span.set_attribute('search.keyword_prefetch_reused', True)
+        else:
+            request_span.set_attribute('search.keyword_prefetch_reused', False)
+        result = store.hybrid_search(q=q, track=track, level=level, captioned_only=captioned_only,
+                                     day=day, **hybrid_options)
         strategy_reason = result.get('strategy_reason') or strategy_reason
         if mode == 'auto' and result['mode'] == 'keyword':
             talks, source, total = keyword_page
@@ -118,6 +131,11 @@ def search_result(q="", track=None, level=None, captioned_only=False, mode="keyw
     span = trace.get_current_span()
     span.set_attribute("search.requested_mode", mode)
     span.set_attribute("search.mode", result["mode"])
+    span.set_attribute('search.source', source)
+    span.set_attribute('planner.candidate_count', len(talks))
+    span.set_attribute('search.total', total)
+    span.set_attribute('search.degraded', bool(result.get('degraded_reason')) or source == 'fallback')
+    span.set_attribute('stage.outcome', 'degraded' if source == 'fallback' or result.get('degraded_reason') else 'empty' if not talks else 'ok')
     return {**result, "talks": talks, "source": source, "took_ms": round(took_ms, 2), "total": total,
             "facets": result.get("facets", facets), 'requested_mode': mode, 'strategy_reason': strategy_reason}
 
@@ -257,7 +275,10 @@ def delete_saved_plan(plan_id: str, x_planner_key: str = Header(alias="X-Planner
 
 
 @app.post("/api/build-my-day")
+@stage('planner.day')
 def build_my_day(request: DayRequest):
+    day_span = trace.get_current_span()
+    day_span.set_attribute('planner.day', request.day.isoformat())
     if not tokens(request.interests):
         raise HTTPException(422, 'Enter a topic or experience level, such as beginner sessions.')
     if request.day not in {date(2026, 11, 9), date(2026, 11, 10), date(2026, 11, 11), date(2026, 11, 12)}:
@@ -279,7 +300,17 @@ def build_my_day(request: DayRequest):
     elif browse and request.mode == 'auto':
         result['requested_mode'] = 'auto'
         result['strategy_reason'] = 'No topic supplied; browsing sessions by filters.'
-    picked = build_day(result["talks"], interests, semantic=result["mode"] == "hybrid", max_talks=max_talks, browse=browse)
+    with stage('planner.select', **{'planner.day': request.day.isoformat(), 'planner.requested_cap': max_talks,
+                                   'planner.candidate_count': len(result['talks'])}) as selection_span:
+        picked = build_day(result["talks"], interests, semantic=result["mode"] == "hybrid", max_talks=max_talks, browse=browse)
+        selection_span.set_attribute('planner.selected_count', len(picked))
+        selection_span.set_attribute('stage.outcome', 'ok' if picked else 'empty')
+    day_span.set_attribute('planner.selected_count', len(picked))
+    day_span.set_attribute('planner.candidate_count', len(result['talks']))
+    day_span.set_attribute('search.source', result['source'])
+    day_span.set_attribute('search.mode', result['mode'])
+    if max_talks is not None:
+        day_span.set_attribute('planner.requested_cap', max_talks)
     candidate_count = len(result['talks'])
     selection_note = ''
     if max_talks is not None and len(picked) < max_talks:
@@ -293,6 +324,7 @@ def build_my_day(request: DayRequest):
 
 
 @app.post('/api/build-conference')
+@stage('planner.conference', **{'planner.day_count': 3})
 def build_conference(request: ConferenceRequest):
     if not tokens(request.interests):
         raise HTTPException(422, 'Describe your interests for Day 1, Day 2, and Day 3.')

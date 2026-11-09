@@ -250,3 +250,42 @@ Implemented POST /api/build-conference: one OpenAI extraction, three independent
 Gitar PR1 review identified first-save identity loss during in-flight edits. Fixed with draft context protection and mocked regressions for normal edits versus new drafts. Review: https://github.com/harshanirudh/hackathon-find-the-right-talk/pull/1#issuecomment-6752117548
 
 Three-day drafts are in memory until each day is saved. Original preferences are not stored with daily records. No combined plan record, clarification, export or new services. Render redeployment is required after publishing this revision; do not claim the new feature is hosted until verified.
+
+## Dash0 increment — November 9, 4:38 PM MST
+
+Verified real local ingestion into Dash0 US west, service `find-the-right-talk`,
+dataset `default`, using actual MCP listDatasets/getSpans/getTraceDetails,
+trace-correlated getLogRecords, and PromQL search.requests. First trace:
+`52c67c84d0fd7168c3259958f7cab07e`. Credentials remain ignored.
+
+Connected interpretation, keyword/semantic retrieval and per-day selection
+spans report actual modes/sources/counts/caps, sanitized errors and durations.
+Real three-day trace `b2f95b74475165cc067ec61c4ec437c6` selected 3/2/4 sessions
+on Nov10/11/12 and recorded one OpenAI extraction with 529 input/91 output
+tokens. Separate repeated single-day traces verify cache miss then hit, with
+no model-call span or duplicated usage for the hit. Raw query text was removed
+from search logs/spans; HTTP query parameters are sanitized.
+
+Actual Agent0 MCP investigation thread `fcf09349-07f0-4145-b3d6-2171ea1bc2de`
+identified five serialized Elasticsearch round-trips. Code inspection then
+confirmed automatic preflight was followed by another keyword query. Reuse
+compatible preflight results while retaining pagination/fallback behavior and
+both distinct embedding-coverage checks. Dash0 after trace
+`8c82889dbbe6761bd60602bc8ad43ccf` confirms four round-trips; five requests
+retained identical ranked session IDs. Cloud timings vary and concurrent
+browser checks affected the after sample: no percentage latency claim.
+
+Full investigation, trace exports and timings are preserved in ignored
+`artifacts/dash0-evidence.md` and adjacent JSON/Markdown files. Token-authenticated
+Agent0 threads are not attributed to a user account; their UI link may not open.
+Hosted ingestion remains unverified until Render environment configuration and
+redeployment. Browser RUM, dashboards and SLOs are deferred. Original captioned
+video is preserved; no claim of a new Dash0 video yet.
+
+Verification completed: 131 pytest tests and 11 subtests pass with export disabled
+for tests. Real browser smoke with OpenAI and Elastic Cloud passes planner,
+inline plan CRUD, retained/empty drafts, date-scoped browsing, facets/highlights,
+clashes, venue walking budgets and mobile. Corrected the smoke script's evidence
+button selector to target the opened search-result card rather than a hidden
+agenda button; no attendee UI changed. Public health probe timed out after 30s;
+this attempt does not verify hosted Dash0 or establish a hosted outage.

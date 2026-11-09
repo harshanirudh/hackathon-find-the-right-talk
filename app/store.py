@@ -12,6 +12,7 @@ from .local_ai import LocalAI, LocalAIUnavailable, EMBEDDING_DIMS
 from .hybrid import reciprocal_rank_fusion
 from .elastic_ai import raw_request, semantic_query, hybrid_body, CloudSemanticError, SOURCE_EXCLUDES
 from opentelemetry import trace
+from .stages import stage
 
 tracer = trace.get_tracer("talk_search.store")
 
@@ -49,6 +50,7 @@ class Store:
         talks, source, _, _ = self.search_page(q, track, level, captioned_only, size=1000, day=day)
         return talks, source
 
+    @stage('search.keyword')
     def search_page(self, q="", track=None, level=None, captioned_only=False, offset=0, size=24, day=None):
         try:
             response = self.client.search(index=INDEX, query=build_query(q, track, level, captioned_only, day),
@@ -222,8 +224,11 @@ class Store:
         self.client.delete(index=PLANS_INDEX, id=plan_id, refresh="wait_for")
         return True
 
-    def hybrid_search(self, q, track=None, level=None, captioned_only=False, day=None):
-        keyword_talks, source, total, facets = self.search_page(q, track, level, captioned_only, size=24, day=day)
+    def hybrid_search(self, q, track=None, level=None, captioned_only=False, day=None, prefetched_keyword=None):
+        if prefetched_keyword is None:
+            keyword_talks, source, total, facets = self.search_page(q, track, level, captioned_only, size=24, day=day)
+        else:
+            keyword_talks, source, total, facets = prefetched_keyword
         result = {"talks": keyword_talks, "source": source, "mode": "keyword",
                   "requested_mode": "hybrid", "degraded_reason": None, "total": total, "facets": facets}
         if not q.strip():
@@ -245,14 +250,14 @@ class Store:
             if vector_count != total_count:
                 raise LocalAIUnavailable("Some sessions lack current embeddings. Run python -m app.embed to finish indexing.")
             vector = list(self.ai.query_embedding(q))
-            with tracer.start_as_current_span("search.vector"):
+            with stage("search.vector"):
                 response = self.client.search(index=INDEX, knn={
                     "field": "embedding", "query_vector": vector, "k": 8,
                     "num_candidates": 100, "similarity": 0.25,
                     "filter": {"bool": {"filter": vector_filters}}},
                     source_excludes=SOURCE_EXCLUDES, size=8)
             semantic_talks = [public_talk(hit["_source"]) for hit in response["hits"]["hits"]]
-            with tracer.start_as_current_span("search.fusion"):
+            with stage("search.fusion"):
                 fused = reciprocal_rank_fusion(keyword_talks, semantic_talks)
             return {"talks": fused, "source": "elasticsearch", "mode": "hybrid",
                     "requested_mode": "hybrid", "degraded_reason": None,
@@ -296,7 +301,7 @@ class Store:
         if not embedded or embedded != total:
             raise LocalAIUnavailable("Cloud semantic content is not fully indexed. Run python -m app.embed.")
         fusion = "elasticsearch_rrf"
-        with tracer.start_as_current_span("search.elastic_semantic") as span:
+        with stage("search.elastic_semantic") as span:
             span.set_attribute("ai.model", self.inference_id)
             body = hybrid_body(q, build_query(q, track, level, captioned_only, day), filters)
             try:
