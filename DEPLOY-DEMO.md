@@ -51,6 +51,21 @@ Official setup references: [FastAPI on Render](https://render.com/docs/deploy-fa
 [Blueprint configuration](https://render.com/docs/blueprint-spec),
 [free service limits](https://render.com/docs/free).
 
+## Optional Dash0 environment
+
+After deploying the telemetry privacy/stage changes, add these values in
+Render's secret environment settings and redeploy:
+
+- `OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.us-west-2.aws.dash0.com`
+- `DASH0_AUTH_TOKEN`: the token from ignored local configuration.
+- `DASH0_DATASET=default`
+- `OTEL_SERVICE_NAME=find-the-right-talk`
+
+The MCP endpoint is `https://api.us-west-2.aws.dash0.com/mcp`; it is used for
+investigation and is not needed by the running app. Never put the backend
+token in browser code. `/health` reports exporter configuration, not confirmed
+ingestion. Verify a request from the hosted app in Dash0 separately.
+
 ## Two-minute demo
 
 Lead with the attendee problem: choosing a few relevant talks without opening
