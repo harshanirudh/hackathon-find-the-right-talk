@@ -2,7 +2,7 @@
 import unittest
 from itertools import combinations
 
-from app.agenda import analyze_agenda, build_day, day_interest_terms, overlaps, parse_day_request
+from app.agenda import analyze_agenda, build_day, conference_day, day_interest_terms, overlaps, parse_day_request
 from app.data import TALKS
 from app.search import build_query, fallback_search
 
@@ -22,6 +22,13 @@ def talk(identifier, start="10:00", end="10:45", **changes):
 
 
 class SearchTests(unittest.TestCase):
+    def test_multiple_levels_use_elasticsearch_terms_and_filtered_fallback(self):
+        query = build_query('kubernetes', level=['beginner', 'intermediate'])
+        self.assertIn({'terms': {'level': ['beginner', 'intermediate']}}, query['bool']['filter'])
+        data = [talk('beginner'), talk('middle', level='intermediate'), talk('advanced', level='advanced')]
+        selected = fallback_search(data, 'kubernetes', level=['beginner', 'intermediate'])
+        self.assertEqual({t['id'] for t in selected}, {'beginner', 'middle'})
+
     def test_seed_is_complete_and_identifiers_unique(self):
         self.assertEqual(len(TALKS), 28)
         self.assertEqual(len({t["id"] for t in TALKS}), 28)
@@ -72,6 +79,34 @@ class SearchTests(unittest.TestCase):
 
 
 class AgendaTests(unittest.TestCase):
+    def test_agenda_rejects_cross_date_sessions(self):
+        first = talk('first')
+        other = talk('other', start='11:00', end='11:45')
+        other['start'] = other['start'].replace('11-09', '11-10')
+        other['end'] = other['end'].replace('11-09', '11-10')
+        with self.assertRaisesRegex(ValueError, 'one conference day'):
+            analyze_agenda(['first', 'other'], [first, other])
+
+    def test_alternatives_stay_on_plan_date(self):
+        first, clash = talk('first'), talk('clash')
+        valid = talk('valid', start='12:00', end='12:45')
+        tomorrow = {**valid, 'id': 'tomorrow',
+                    'start': valid['start'].replace('11-09', '11-10'),
+                    'end': valid['end'].replace('11-09', '11-10')}
+        data = analyze_agenda(['first', 'clash'], [first, clash, valid, tomorrow])
+        self.assertEqual(data['day'], '2026-11-09')
+        self.assertTrue(all(option['id'] != 'tomorrow' for options in data['alternatives'].values() for option in options))
+
+    def test_plan_date_uses_conference_timezone(self):
+        self.assertEqual(conference_day({'start': '2026-11-11T01:00:00+00:00'}), '2026-11-10')
+
+    def test_typo_request_normalizes_topic_level_and_atmost_cap(self):
+        for constraint in ('atmost 3 sessions', 'at most three sessions', 'atmost 3'):
+            interests, maximum = parse_day_request('beginer kubernets ' + constraint)
+            self.assertEqual(maximum, 3)
+            self.assertEqual(interests, 'beginner kubernetes')
+            self.assertEqual(day_interest_terms(interests), 'kubernetes')
+
     def test_explicit_maximum_is_removed_from_interests_and_parsed(self):
         interests, maximum = parse_day_request("getting started with Kubernetes maximum 5 talks")
         self.assertEqual(interests, "getting started with Kubernetes")
@@ -79,7 +114,7 @@ class AgendaTests(unittest.TestCase):
         interests, maximum = parse_day_request("cloud security, no more than three sessions")
         self.assertEqual(interests, "cloud security")
         self.assertEqual(maximum, 3)
-        self.assertEqual(day_interest_terms("getting started with Kubernetes"), "getting started kubernetes")
+        self.assertEqual(day_interest_terms("getting started with Kubernetes"), "kubernetes")
 
     def test_generated_day_honors_explicit_talk_cap(self):
         interests, maximum = parse_day_request("Kubernetes, maximum 5 talks")

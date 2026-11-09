@@ -1,6 +1,8 @@
 import logging
 import os
 import json
+import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch, helpers
@@ -16,6 +18,7 @@ tracer = trace.get_tracer("talk_search.store")
 load_dotenv()
 logger = logging.getLogger(__name__)
 INDEX = "talks"
+PLANS_INDEX = "saved-plans"
 _SCHEDULE_PATH = Path(__file__).resolve().parents[1] / "data" / "kubecon-na-2026.json"
 KUBECON_TALKS = json.loads(_SCHEDULE_PATH.read_text())["talks"] if _SCHEDULE_PATH.exists() else []
 _PLACES_PATH = Path(__file__).resolve().parents[1] / "data" / "places.json"
@@ -150,6 +153,75 @@ class Store:
         except NotFoundError:
             return None
 
+    def get_talks_by_ids(self, talk_ids):
+        """Fetch saved-plan talks from Elasticsearch in the caller's order."""
+        if not talk_ids:
+            return []
+        response = self.client.mget(index=INDEX, ids=talk_ids, source_excludes=SOURCE_EXCLUDES)
+        found = {doc["_id"]: public_talk(doc["_source"]) for doc in response["docs"] if doc.get("found")}
+        return [found[talk_id] for talk_id in talk_ids if talk_id in found]
+
+    def _ensure_plans_index(self):
+        if self.client.indices.exists(index=PLANS_INDEX):
+            return
+        mapping = {"properties": {
+            "owner_hash": {"type": "keyword"}, "name": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+            "talk_ids": {"type": "keyword"}, "day": {"type": "date"},
+            "created_at": {"type": "date"}, "updated_at": {"type": "date"}}}
+        try:
+            self.client.indices.create(index=PLANS_INDEX, mappings=mapping)
+        except Exception:
+            # A concurrent first save may have created the index already.
+            if not self.client.indices.exists(index=PLANS_INDEX):
+                raise
+
+    def create_plan(self, owner_hash, name, talk_ids, day=None):
+        self._ensure_plans_index()
+        now = datetime.now(timezone.utc).isoformat()
+        plan = {"id": secrets.token_urlsafe(16), "owner_hash": owner_hash, "name": name,
+                "talk_ids": talk_ids, "day": day, "created_at": now, "updated_at": now}
+        self.client.index(index=PLANS_INDEX, id=plan["id"], document=plan, refresh="wait_for")
+        return {key: value for key, value in plan.items() if key != "owner_hash"}
+
+    def list_plans(self, owner_hash):
+        self._ensure_plans_index()
+        response = self.client.search(index=PLANS_INDEX,
+            query={"term": {"owner_hash": owner_hash}}, size=100,
+            sort=[{"updated_at": {"order": "desc"}}], source_excludes=["owner_hash"])
+        return [{"id": hit["_id"], **hit["_source"], "talk_count": len(hit["_source"].get("talk_ids", []))}
+                for hit in response["hits"]["hits"]]
+
+    def get_plan(self, owner_hash, plan_id):
+        from elasticsearch import NotFoundError
+        try:
+            source = self.client.get(index=PLANS_INDEX, id=plan_id)["_source"]
+        except NotFoundError:
+            return None
+        if source.get("owner_hash") != owner_hash:
+            return None
+        talk_ids = source.get("talk_ids", [])
+        return {"id": plan_id, "name": source["name"], "talk_ids": talk_ids,
+                "talks": self.get_talks_by_ids(talk_ids), "day": source.get("day"),
+                "created_at": source["created_at"], "updated_at": source["updated_at"]}
+
+    def update_plan(self, owner_hash, plan_id, name, talk_ids, day=None):
+        existing = self.get_plan(owner_hash, plan_id)
+        if existing is None:
+            return None
+        now = datetime.now(timezone.utc).isoformat()
+        plan = {"id": plan_id, "owner_hash": owner_hash, "name": name, "talk_ids": talk_ids,
+                "day": day, "created_at": existing["created_at"], "updated_at": now}
+        self.client.index(index=PLANS_INDEX, id=plan_id, document=plan, refresh="wait_for")
+        return {**{key: value for key, value in plan.items() if key != "owner_hash"},
+                "talks": self.get_talks_by_ids(talk_ids)}
+
+    def delete_plan(self, owner_hash, plan_id):
+        from elasticsearch import NotFoundError
+        if self.get_plan(owner_hash, plan_id) is None:
+            return False
+        self.client.delete(index=PLANS_INDEX, id=plan_id, refresh="wait_for")
+        return True
+
     def hybrid_search(self, q, track=None, level=None, captioned_only=False, day=None):
         keyword_talks, source, total, facets = self.search_page(q, track, level, captioned_only, size=24, day=day)
         result = {"talks": keyword_talks, "source": source, "mode": "keyword",
@@ -217,6 +289,10 @@ class Store:
         complete_filters = filters + [{"exists": {"field": "semantic_content"}}]
         embedded = self.client.count(index=INDEX, query={"bool": {"filter": complete_filters}})["count"]
         total = self.client.count(index=INDEX, query={"bool": {"filter": filters}})["count"]
+        if total == 0:
+            return {'talks': [], 'source': 'elasticsearch', 'mode': 'keyword',
+                    'requested_mode': 'hybrid', 'degraded_reason': None,
+                    'strategy_reason': 'No sessions match these filters; semantic retrieval cannot add eligible sessions.'}
         if not embedded or embedded != total:
             raise LocalAIUnavailable("Cloud semantic content is not fully indexed. Run python -m app.embed.")
         fusion = "elasticsearch_rrf"

@@ -86,6 +86,17 @@ def test_incomplete_cloud_backfill_explicitly_degrades_to_keyword(cloud_store):
     request.assert_not_called()
 
 
+def test_empty_filter_set_does_not_claim_missing_embeddings(cloud_store):
+    cloud_store.client.search.return_value = {'hits': {'hits': []}}
+    cloud_store.client.count.return_value = {'count': 0}
+    with patch('app.store.raw_request') as request:
+        result = cloud_store.hybrid_search('kubernetes', level='intermediate')
+    assert result['talks'] == [] and result['mode'] == 'keyword'
+    assert result['degraded_reason'] is None
+    assert 'No sessions match' in result['strategy_reason']
+    request.assert_not_called()
+
+
 def test_cloud_semantic_failure_does_not_claim_hybrid_or_leak_error_messages(cloud_store):
     from app.elastic_ai import CloudSemanticError
     cloud_store.client.search.return_value = {"hits": {"hits": [{"_source": TALKS[0]}]}}
