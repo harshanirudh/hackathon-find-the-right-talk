@@ -1,0 +1,87 @@
+{
+  "venue": {
+    "name": "The Shop Workspace",
+    "lat": 40.76032,
+    "lon": -111.88099,
+    "address": "350 E 400 S, Salt Lake City, UT"
+  },
+  "radius_m": 1000,
+  "source": "https://overpass-api.de/api/interpreter",
+  "attribution": "© OpenStreetMap contributors",
+  "fetched_from_overpass": false,
+  "curated_fallback_reason": "Primary Overpass endpoint returned HTTP 502; mirrors timed out. Places verified through Photon OSM search on 2026-11-09.",
+  "places": [
+    {
+      "id": "osm-node-13776749561",
+      "name": "Hallowed Grounds",
+      "category": "cafe",
+      "address": "370 South 300 East, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.7609148,
+      "lon": -111.882989
+    },
+    {
+      "id": "osm-node-2328421316",
+      "name": "Stoneground Kitchen",
+      "category": "restaurant",
+      "address": "249 East 400 South, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.7609919,
+      "lon": -111.883684
+    },
+    {
+      "id": "osm-node-12094299354",
+      "name": "Millcrepes",
+      "category": "restaurant",
+      "address": "330 East 400 South, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.760176,
+      "lon": -111.8821783
+    },
+    {
+      "id": "osm-node-13331225512",
+      "name": "JJ Coffee Co",
+      "category": "cafe",
+      "address": "330 East 400 South, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.760446,
+      "lon": -111.8813858
+    },
+    {
+      "id": "osm-node-9335676372",
+      "name": "Les Banh Mi",
+      "category": "restaurant",
+      "address": "249 East 400 South, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.7608832,
+      "lon": -111.8837131
+    },
+    {
+      "id": "osm-node-2327642665",
+      "name": "Cafe Rio",
+      "category": "restaurant",
+      "address": "532 East 400 South, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.7602663,
+      "lon": -111.875525
+    },
+    {
+      "id": "osm-relation-6144703",
+      "name": "Grand America Hotel",
+      "category": "hotel",
+      "address": "555 South Main Street, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.7573462,
+      "lon": -111.8889902
+    },
+    {
+      "id": "osm-way-223923170",
+      "name": "Salt Lake City Marriott City Center",
+      "category": "hotel",
+      "address": "220 South State Street, Salt Lake City, UT 84111",
+      "website": "",
+      "lat": 40.7643327,
+      "lon": -111.8885995
+    }
+  ]
+}

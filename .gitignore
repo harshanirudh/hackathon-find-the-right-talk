@@ -1,0 +1,22 @@
+# Secrets — never commit these
+.env
+.env.*
+!.env.example
+elasticsearch.env
+*.env
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local data / artifacts
+artifacts/
+.local-ai/
+.browser-cache/
+es-data/
+
+# macOS
+.DS_Store
