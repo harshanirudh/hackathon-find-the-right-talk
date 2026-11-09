@@ -1,5 +1,7 @@
 # Find the Right Talk
 
+**Live demo:** [find-the-right-talk.onrender.com](https://find-the-right-talk.onrender.com/)
+
 A conference talk finder and personal day planner built during the November
 9, 2026 WeMakeDevs Cloud Native Hackathon. The searchable catalogue combines
 **478 sessions from the published KubeCon + CloudNativeCon North America 2026
@@ -52,7 +54,10 @@ opted-in real OpenAI/Elasticsearch check; it can incur inference usage.
 
 See [DEPLOY-DEMO.md](DEPLOY-DEMO.md) and [render.yaml](render.yaml) for the free
 Render deployment configuration, hosted verification commands, and demo flow.
-Hosted deployment has not yet been verified.
+The Render deployment passed health, core smoke, real OpenAI/Elasticsearch
+smoke, and browser acceptance on November 9, 2026. It indexes 506 sessions;
+automatic hybrid retrieval, inline saved-plan CRUD, empty results, clashes,
+persistence, keyboard navigation, and mobile layout were verified live.
 
 Project repository: https://github.com/harshanirudh/hackathon-find-the-right-talk
 

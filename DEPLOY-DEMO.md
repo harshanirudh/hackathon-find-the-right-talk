@@ -1,7 +1,14 @@
 # Deploy and demo
 
-The local app and real OpenAI/Elastic Cloud path have been verified. A hosted
-deployment has not yet been created or verified.
+**Verified hosted demo:** https://find-the-right-talk.onrender.com/
+
+On November 9, 2026, the hosted app passed `/health` with Elasticsearch up and
+506 sessions, core smoke, real OpenAI/Elasticsearch smoke, and the combined
+`CHECK_OPENAI=1 CHECK_CLOUD_AI=1` browser acceptance. Verified inline plan
+CRUD, automatic hybrid retrieval and source evidence, empty results, clashes,
+persistence, keyboard navigation, and mobile layout. Test plans were deleted.
+The user's mixed-level Nov10 request returned five compatible sessions; the
+intermediate Kubernetes Nov11 request correctly returned zero.
 
 ## Render free web service
 

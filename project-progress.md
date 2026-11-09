@@ -8,6 +8,24 @@ workspace root is the project. `talk-search-starter/` is reference material
 only; do not copy its implementation or include it in a commit. Keep work
 inside this project; do not access personal folders.
 
+## Hosted deployment — verified November 9
+
+- Public app: https://find-the-right-talk.onrender.com/
+- Deployed from `feature/smart-search-demo`, commit `71c27d9`, via the user's
+  Render Blueprint. PR: https://github.com/harshanirudh/hackathon-find-the-right-talk/pull/1
+- `/health` reports Elasticsearch up and 506 indexed sessions. Core smoke and
+  real OpenAI smoke passed on the public URL. The full hosted
+  `CHECK_OPENAI=1 CHECK_CLOUD_AI=1` browser check passed actual automatic hybrid
+  retrieval/source evidence, inline library CRUD, zero-result display, clashes,
+  persistence, keyboard navigation, venues/facets/highlights, and mobile layout.
+- Exact mixed-level Nov10 prompt returned five same-day sessions without
+  overlaps; exact intermediate Kubernetes Nov11 prompt returned zero. Temporary
+  browser acceptance plans were deleted by the test flow.
+- Local suite: 114 passing tests plus 11 subtests. GitHub test checks passed.
+  Credentials and reference starter were excluded from the published branch.
+- Dash0 export is disabled in hosted health. Gitar check was pending when last
+  inspected; no completed review is claimed. Free-host cold starts still apply.
+
 ## Product and stack
 
 Find the Right Talk: search the KubeCon + CloudNativeCon NA 2026 program and
@@ -79,7 +97,8 @@ Last recorded verification (not rerun during this handoff update):
   `CHECK_OPENAI=1 CHECK_CLOUD_AI=1` browser rehearsal **passed**, including real
   automatic hybrid retrieval and extractive evidence, OpenAI interpretation,
   inline library CRUD, empty results, persistence, clashes, and mobile layout.
-  Hosting remains prepared but undeployed; Dash0/Gitar evidence remains pending.
+  Hosting was subsequently deployed and verified; see the hosted status above.
+  Dash0/Gitar evidence remains pending.
 
 - Fixed the exact request “beginer friendly and medium day 1 with 5 sessions
   covering essential on kubernetes and security.” The original intent schema
