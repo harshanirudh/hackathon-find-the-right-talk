@@ -14,7 +14,7 @@ def build_query(q="", track=None, level=None, captioned_only=False, day=None):
     if track:
         filters.append({"term": {"track": track}})
     if level:
-        filters.append({"term": {"level": level}})
+        filters.append({"terms": {"level": level}} if isinstance(level, list) else {"term": {"level": level}})
     if captioned_only:
         filters.append({"term": {"accessibility.captioned": True}})
     if day:
@@ -32,7 +32,7 @@ def fallback_search(talks, q="", track=None, level=None, captioned_only=False):
     for talk in talks:
         if track and talk["track"] != track:
             continue
-        if level and talk["level"] != level:
+        if level and talk["level"] not in (level if isinstance(level, list) else [level]):
             continue
         if captioned_only and not talk["accessibility"]["captioned"]:
             continue

@@ -4,6 +4,7 @@
 !.env.example
 elasticsearch.env
 *.env
+*.swp
 
 # Python
 .venv/

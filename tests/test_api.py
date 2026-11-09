@@ -65,7 +65,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["max_talks"], 5)
-        self.assertEqual(payload["interests"], "getting started kubernetes")
+        self.assertEqual(payload["interests"], "kubernetes")
         self.assertLessEqual(payload["total"], 5)
         self.assertEqual(payload["total"], len(payload["talks"]))
 
@@ -73,6 +73,59 @@ class ApiTests(unittest.TestCase):
         response = self.client.post("/api/agenda", json={"talk_ids": ["missing"]})
         self.assertEqual(response.status_code, 422)
         self.assertIn("Unknown", response.json()["detail"])
+
+    def test_browsing_a_plan_day_does_not_return_other_dates(self):
+        response = self.client.get('/api/search', params={'q': 'kubernetes', 'day': '2026-11-10'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['day'], '2026-11-10')
+        self.assertEqual(response.json()['talks'], [])
+        self.assertEqual(str(self.store.search_page.call_args.kwargs['day']), '2026-11-10')
+        response = self.client.get('/api/search', params={'q': 'kubernetes', 'day': '2026-11-09'})
+        self.assertTrue(response.json()['talks'])
+        self.assertTrue(all(t['start'].startswith('2026-11-09') for t in response.json()['talks']))
+
+    def test_beginner_intent_filters_candidates_before_scheduling(self):
+        for phrase in ("getting started with", "new to", "first steps in", "introductory", "beginner"):
+            with self.subTest(phrase=phrase):
+                response = self.client.post("/api/build-my-day", json={
+                    "interests": phrase + " kubernetes maximum 5 talks", "day": "2026-11-09"})
+                payload = response.json()
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(payload["interests"], "kubernetes")
+                self.assertEqual(payload["effective_level"], "beginner")
+                self.assertTrue(payload["talks"])
+                self.assertTrue(all(t["level"] == "beginner" for t in payload["talks"]))
+                self.assertTrue(all("listed as beginner" in t["reason"] for t in payload["talks"]))
+                self.assertEqual(self.store.search_page.call_args.kwargs["level"], "beginner")
+
+    def test_explicit_level_overrides_inferred_beginner_level(self):
+        payload = self.client.post("/api/build-my-day", json={
+            "interests": "getting started with kubernetes", "level": "advanced",
+            "day": "2026-11-09"}).json()
+        self.assertEqual(payload["effective_level"], "advanced")
+        self.assertEqual(self.store.search_page.call_args.kwargs["level"], "advanced")
+        self.assertTrue(all(t["level"] == "advanced" for t in payload["talks"]))
+
+    def test_exact_misspelled_request_enforces_three_session_cap(self):
+        response = self.client.post('/api/build-my-day', json={
+            'interests': 'beginer kubernets atmost 3 sessions', 'day': '2026-11-09'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['interests'], 'kubernetes')
+        self.assertEqual(data['effective_level'], 'beginner')
+        self.assertEqual(data['max_talks'], 3)
+        self.assertTrue(data['talks'])
+        self.assertLessEqual(len(data['talks']), 3)
+        self.assertTrue(all(t['level'] == 'beginner' for t in data['talks']))
+        self.assertEqual(data['clashes'], [])
+        self.assertEqual(self.store.search_page.call_args.kwargs['q'], 'kubernetes')
+
+    def test_introductory_intent_without_topic_browses_beginner_sessions(self):
+        response = self.client.post("/api/build-my-day", json={"interests": "getting started", 'day': '2026-11-09'})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['talks'])
+        self.assertEqual(self.store.search_page.call_args.kwargs['q'], '')
+        self.assertEqual(self.store.search_page.call_args.kwargs['level'], 'beginner')
 
     def test_health_is_degraded_when_cluster_is_down(self):
         self.store.health.return_value = {"elasticsearch": "down", "talks_indexed": 0}
