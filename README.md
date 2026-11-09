@@ -318,3 +318,13 @@ development: keep port 9200 bound to loopback and do not expose it publicly.
 
 See [MVP-PLAN.md](MVP-PLAN.md) for feature acceptance criteria and
 [AGENT-BRIEF.md](AGENT-BRIEF.md) for the supplied build brief.
+
+## Three-day MVP
+
+Choose All 3 days, or describe Day 1, Day 2 and Day 3 in one request. One OpenAI structured-output call extracts separate preferences for November 10–12, 2026. Each dated section independently retrieves sessions, checks clashes, supports removal, and saves through the existing daily-plan API. Empty/error days do not hide successful days. Save each day before refreshing; there is no combined conference record.
+
+Example: Day 1 beginner and intermediate Kubernetes/security max 3; Day 2 observability/tracing any level max 2; Day 3 platform engineering any level max 4.
+
+API: POST /api/build-conference with interests (up to 2000 characters), mode auto, and optional captioned_only. Run scripts/multi_day_smoke.py for real extraction, retrieval and daily save/reopen checks. Run scripts/browser_multi_day.py for mocked UI regressions; CHECK_LIVE_CONFERENCE=1 opts into the real browser walkthrough.
+
+Deferred: combined storage, conversational clarification, calendar export, new services.

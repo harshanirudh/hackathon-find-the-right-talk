@@ -74,6 +74,16 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertIn("Unknown", response.json()["detail"])
 
+    def test_browsing_a_plan_day_does_not_return_other_dates(self):
+        response = self.client.get('/api/search', params={'q': 'kubernetes', 'day': '2026-11-10'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['day'], '2026-11-10')
+        self.assertEqual(response.json()['talks'], [])
+        self.assertEqual(str(self.store.search_page.call_args.kwargs['day']), '2026-11-10')
+        response = self.client.get('/api/search', params={'q': 'kubernetes', 'day': '2026-11-09'})
+        self.assertTrue(response.json()['talks'])
+        self.assertTrue(all(t['start'].startswith('2026-11-09') for t in response.json()['talks']))
+
     def test_beginner_intent_filters_candidates_before_scheduling(self):
         for phrase in ("getting started with", "new to", "first steps in", "introductory", "beginner"):
             with self.subTest(phrase=phrase):

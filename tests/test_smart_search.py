@@ -166,3 +166,14 @@ def test_multiple_levels_are_validated_in_real_structured_response():
         {'type': 'message', 'content': [{'type': 'output_text', 'text': intent(level=['beginner', 'intermediate']).model_dump_json()}]}]}
     with patch('app.smart_search.httpx.post', return_value=response):
         assert interpret_request('beginner and medium kubernetes max 3', True)['level'] == ['beginner', 'intermediate']
+
+
+def test_active_plan_date_wins_when_browsing_a_smart_query():
+    with patch('app.main.store') as store, patch('app.smart_search._extract', return_value=intent(day='2026-11-10')), TestClient(app) as client:
+        store.search_page.return_value = ([], 'elasticsearch', 0, {})
+        response = client.get('/api/search', params={
+            'q': 'beginner kubernetes', 'smart': True, 'day': '2026-11-11'})
+        assert response.status_code == 200
+        assert store.search_page.call_args.kwargs['day'] == '2026-11-11'
+        assert response.json()['day'] == '2026-11-11'
+        assert response.json()['interpretation']['day'] == '2026-11-11'

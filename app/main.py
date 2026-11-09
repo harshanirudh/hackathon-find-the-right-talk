@@ -13,6 +13,7 @@ from .agenda import analyze_agenda, build_day, validate_plan_day
 from .search import tokens
 from .store import PLACES_DATA, Store
 from .smart_search import compatible_levels, interpret_request
+from .multi_day import ConferenceRequest, ConferenceInterpretationUnavailable, extract_conference, build_conference_days
 from .telemetry import configure, record_search
 from .local_ai import LocalAIUnavailable
 from opentelemetry import trace
@@ -141,13 +142,14 @@ def liveness():
 
 
 @app.get("/api/search")
-def search(q: str = "", track: str | None = None, level: str | None = None, captioned_only: bool = False, mode: Literal["keyword", "hybrid", "auto"] = "keyword", limit: int = 24, offset: int = 0, smart: bool = False):
+def search(q: str = "", track: str | None = None, level: str | None = None, captioned_only: bool = False, mode: Literal["keyword", "hybrid", "auto"] = "keyword", limit: int = 24, offset: int = 0, smart: bool = False, day: date | None = None):
     if len(q) > 500:
         raise HTTPException(422, "Search text must be 500 characters or fewer.")
     if not 1 <= limit <= 100 or not 0 <= offset <= 5000:
         raise HTTPException(422, "Search page must contain 1–100 talks and use an offset from 0 to 5000.")
     if not smart or not tokens(q):
-        return search_result(q, track, level, captioned_only, mode, limit, offset)
+        return {**search_result(q, track, level, captioned_only, mode, limit, offset, day=day),
+                'day': day.isoformat() if day else None}
     intent = interpret_request(q, smart=True)
     if not intent['query'] and not (level or intent['level'] or captioned_only or intent['captioned_only'] or track):
         raise HTTPException(422, 'Enter a topic, such as Kubernetes or security.')
@@ -155,11 +157,13 @@ def search(q: str = "", track: str | None = None, level: str | None = None, capt
     captions = captioned_only or intent['captioned_only']
     cap = intent['max_talks']
     page_size = min(limit, max(1, cap - offset)) if cap is not None else limit
-    result = search_result(intent['query'], track, effective_level, captions, mode, page_size, offset, day=intent['day'])
+    effective_day = day.isoformat() if day else intent['day']
+    result = search_result(intent['query'], track, effective_level, captions, mode, page_size, offset, day=effective_day)
     if cap is not None:
         result['total'] = min(result['total'], cap)
         result['talks'] = result['talks'][:max(0, cap - offset)]
-    return {**result, 'interpretation': {**intent, 'level': effective_level, 'captioned_only': captions}}
+    return {**result, 'day': effective_day,
+            'interpretation': {**intent, 'level': effective_level, 'captioned_only': captions, 'day': effective_day}}
 
 
 @app.get("/api/talks")
@@ -286,6 +290,17 @@ def build_my_day(request: DayRequest):
             "interests": interests, "effective_level": effective_level, "clashes": [],
             'candidate_count': candidate_count, 'selection_note': selection_note,
             "interpretation": {**intent, 'level': effective_level, 'captioned_only': captions, 'day': request.day.isoformat()}}
+
+
+@app.post('/api/build-conference')
+def build_conference(request: ConferenceRequest):
+    if not tokens(request.interests):
+        raise HTTPException(422, 'Describe your interests for Day 1, Day 2, and Day 3.')
+    try:
+        intent, model = extract_conference(request.interests)
+    except ConferenceInterpretationUnavailable as exc:
+        raise HTTPException(503, str(exc)) from None
+    return build_conference_days(intent, model, request, search_result)
 
 
 class ExplainRequest(BaseModel):

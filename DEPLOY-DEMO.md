@@ -53,6 +53,10 @@ Official setup references: [FastAPI on Render](https://render.com/docs/deploy-fa
 
 ## Two-minute demo
 
+Lead with the attendee problem: choosing a few relevant talks without opening
+dozens of schedule pages or accidentally booking overlapping sessions. Explain
+the technology only after showing that useful result.
+
 Short feature tooltips explain the implementation for judges. Open only the
 relevant note while presenting; the source/mode indicators remain the evidence
 of what actually served a request, including any fallback.
@@ -69,9 +73,26 @@ of what actually served a request, including any fallback.
 3. **Plans:** name and save the day beside its agenda in My Day. Expand Open
    saved plan beside Save, open the saved day, edit it, and save changes in
    that same workspace.
-4. **Venue:** show Stay and Eat & drink; distances come from Elasticsearch geo
-   sorting over the visibly labelled curated OSM snapshot.
+4. **Optional venue utility:** choose a five-minute versus ten-minute walking
+   budget and Coffee or Eat & drink. Elasticsearch filters the radius/category
+   and returns nearest places first. The current eight-place snapshot produced
+   five results within 400 m and eight within 800 m during verification. This is a
+   small convenience near The Shop hackathon demo venue, not live business
+   availability or a claim that this is the KubeCon conference venue.
 5. Mention Dash0/Gitar only if real evidence has subsequently been collected.
+
+## What actually demonstrates Elasticsearch
+
+- Weighted search, query-time filters, live facets, and highlights over 506
+  indexed sessions; the UI shows the real source and actual retrieval mode.
+- Natural-language retrieval combines lexical and Elastic/Jina semantic
+  branches with RRF. Do not claim zero keyword matches for a phrase without
+  measuring the current catalogue; the official snapshot changed those counts.
+- Date and experience filters apply before selecting a personal day. Python
+  handles interval compatibility and selection; Elasticsearch supplies sessions.
+- Saved days live in a separate Elasticsearch index. Nearby places use real
+  geo-distance filtering/sorting. Seeded snapshot data remains snapshot data;
+  dynamic query behavior and useful attendee choices are the evidence.
 
 ## Recovery during the demo
 

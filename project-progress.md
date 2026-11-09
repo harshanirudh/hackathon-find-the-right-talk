@@ -240,3 +240,13 @@ Credentials belong in ignored environment files; never display or commit their
 values. Do not restart Docker Elasticsearch without need: the active project
 uses Elastic Cloud. Report infrastructure failures separately from tested app
 behavior.
+
+## Three-day MVP verification — November 9
+
+Implemented POST /api/build-conference: one OpenAI extraction, three independent dated retrieval/scheduling results, partial-empty/error isolation. Compact workspace supports three daily sections, isolated removal/save, and reopening one daily record without losing others. Single-day flow remains supported.
+
+125 pytest tests and 11 subtests pass. Real API acceptance returned 3/2/4 compatible sessions on Nov10/11/12, independently saved/reopened/deleted. A second real request returned ok/empty/ok with intermediate Nov11 explicitly empty. Focused mocked UI passed removal isolation, stale-response protection, daily-save identity and empty/error isolation. One real browser walkthrough passed all three sections and independent daily saving/reopening; temporary records were deleted.
+
+Gitar PR1 review identified first-save identity loss during in-flight edits. Fixed with draft context protection and mocked regressions for normal edits versus new drafts. Review: https://github.com/harshanirudh/hackathon-find-the-right-talk/pull/1#issuecomment-6752117548
+
+Three-day drafts are in memory until each day is saved. Original preferences are not stored with daily records. No combined plan record, clarification, export or new services. Render redeployment is required after publishing this revision; do not claim the new feature is hosted until verified.
